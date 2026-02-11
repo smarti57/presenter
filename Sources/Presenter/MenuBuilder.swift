@@ -35,6 +35,15 @@ enum MenuBuilder {
         fullscreen.keyEquivalentModifierMask = [.command, .control]
         viewMenu.addItem(fullscreen)
 
+        // Presentation menu
+        let presentationMenuItem = NSMenuItem()
+        mainMenu.addItem(presentationMenuItem)
+        let presentationMenu = NSMenu(title: "Presentation")
+        presentationMenuItem.submenu = presentationMenu
+        let presentItem = NSMenuItem(title: "Present", action: #selector(AppDelegate.startPresentation(_:)), keyEquivalent: "\r")
+        presentItem.keyEquivalentModifierMask = [.command]
+        presentationMenu.addItem(presentItem)
+
         return mainMenu
     }
 }

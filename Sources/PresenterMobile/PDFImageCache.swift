@@ -1,11 +1,12 @@
-import AppKit
+#if os(iOS)
+import UIKit
 import PDFKit
 
 final class PDFImageCache {
     let document: PDFDocument
     let pageCount: Int
-    private var cache: [Int: NSImage] = [:]
-    private var renderSize: NSSize
+    private var cache: [Int: UIImage] = [:]
+    private var renderSize: CGSize
     private let lock = NSLock()
 
     var pageAspectRatio: CGFloat? {
@@ -15,13 +16,13 @@ final class PDFImageCache {
         return box.width / box.height
     }
 
-    init(document: PDFDocument, screenSize: NSSize) {
+    init(document: PDFDocument, renderSize: CGSize) {
         self.document = document
         self.pageCount = document.pageCount
-        self.renderSize = screenSize
+        self.renderSize = renderSize
     }
 
-    func updateRenderSize(_ size: NSSize) {
+    func updateRenderSize(_ size: CGSize) {
         lock.lock()
         defer { lock.unlock() }
         if size != renderSize {
@@ -30,7 +31,7 @@ final class PDFImageCache {
         }
     }
 
-    func image(forPage index: Int) -> NSImage? {
+    func image(forPage index: Int) -> UIImage? {
         guard index >= 0, index < pageCount else { return nil }
 
         lock.lock()
@@ -43,25 +44,13 @@ final class PDFImageCache {
 
         guard let page = document.page(at: index) else { return nil }
 
-        // Compute render size that preserves the page's actual aspect ratio
-        let box = page.bounds(for: .mediaBox)
-        let pageAspect = box.width / max(box.height, 1)
-        let fitAspect = currentSize.width / max(currentSize.height, 1)
-        var fitSize = currentSize
-        if pageAspect > fitAspect {
-            fitSize.height = currentSize.width / pageAspect
-        } else {
-            fitSize.width = currentSize.height * pageAspect
-        }
-
-        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
-        let scaledSize = NSSize(
-            width: fitSize.width * scale,
-            height: fitSize.height * scale
+        let scale = UIScreen.main.scale
+        let scaledSize = CGSize(
+            width: currentSize.width * scale,
+            height: currentSize.height * scale
         )
 
         let image = page.thumbnail(of: scaledSize, for: .mediaBox)
-        image.size = fitSize
 
         lock.lock()
         cache[index] = image
@@ -82,3 +71,4 @@ final class PDFImageCache {
         }
     }
 }
+#endif

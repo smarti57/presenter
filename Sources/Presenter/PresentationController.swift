@@ -7,31 +7,39 @@ final class PresentationController {
     private let slideView: SlideView
     private var savedContentView: NSView?
     private var eventMonitor: Any?
-    private var currentIndex = 0
+    private(set) var currentIndex = 0
     private var transitionStyle: TransitionStyle = .fade
+    private let usesNativeFullscreen: Bool
+    var onEnd: ((Int) -> Void)?
 
-    init(window: NSWindow, document: PDFDocument) {
+    init(window: NSWindow, document: PDFDocument, usesNativeFullscreen: Bool = true) {
         let screenSize = window.screen?.frame.size ?? NSSize(width: 1920, height: 1080)
         self.window = window
         self.cache = PDFImageCache(document: document, screenSize: screenSize)
         self.slideView = SlideView(frame: window.contentView?.bounds ?? .zero)
         self.slideView.autoresizingMask = [.width, .height]
+        self.usesNativeFullscreen = usesNativeFullscreen
     }
 
     var pageCount: Int { cache.pageCount }
 
     func start() {
+        start(at: 0, transition: .fade)
+    }
+
+    func start(at index: Int, transition: TransitionStyle) {
+        self.transitionStyle = transition
         savedContentView = window.contentView
 
         window.contentView = slideView
         window.backgroundColor = .black
 
-        if !window.styleMask.contains(.fullScreen) {
+        if usesNativeFullscreen && !window.styleMask.contains(.fullScreen) {
             window.toggleFullScreen(nil)
         }
 
         installEventMonitor()
-        goToSlide(0)
+        goToSlide(index)
         NSCursor.hide()
     }
 
@@ -39,7 +47,9 @@ final class PresentationController {
         removeEventMonitor()
         NSCursor.unhide()
 
-        if window.styleMask.contains(.fullScreen) {
+        let lastIndex = currentIndex
+
+        if usesNativeFullscreen && window.styleMask.contains(.fullScreen) {
             window.toggleFullScreen(nil)
         }
 
@@ -48,6 +58,8 @@ final class PresentationController {
             window.contentView = saved
             savedContentView = nil
         }
+
+        onEnd?(lastIndex)
     }
 
     // MARK: - Navigation
@@ -84,6 +96,17 @@ final class PresentationController {
         }
     }
 
+    private var isScreenBlanked = false
+
+    private func toggleBlankScreen() {
+        isScreenBlanked.toggle()
+        if isScreenBlanked {
+            slideView.displayBlack()
+        } else if let image = cache.image(forPage: currentIndex) {
+            slideView.displayImage(image, transition: nil)
+        }
+    }
+
     // MARK: - Event Handling
 
     private func installEventMonitor() {
@@ -109,10 +132,10 @@ final class PresentationController {
         guard event.type == .keyDown else { return false }
 
         switch event.keyCode {
-        case 123, 126: // left arrow, up arrow
+        case 123, 126, 116: // left arrow, up arrow, page up
             previousSlide()
             return true
-        case 124, 125: // right arrow, down arrow
+        case 124, 125, 121: // right arrow, down arrow, page down
             nextSlide()
             return true
         case 49: // space
@@ -123,6 +146,9 @@ final class PresentationController {
             return true
         case 53: // escape
             endPresentation()
+            return true
+        case 11: // B key – blank/unblank screen
+            toggleBlankScreen()
             return true
         case 17: // T key
             transitionStyle = transitionStyle.next()
