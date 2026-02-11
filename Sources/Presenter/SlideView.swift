@@ -35,4 +35,8 @@ final class SlideView: NSView {
         }
         imageLayer.contents = image
     }
+
+    func displayBlack() {
+        imageLayer.contents = nil
+    }
 }
